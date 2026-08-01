@@ -1,0 +1,9 @@
+_start:
+  MOV RA $34
+  JMP other_func
+  HLT
+
+other_func:
+  MOV RA $50
+  NOP
+
