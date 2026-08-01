@@ -1,4 +1,8 @@
-use crate::tokens::{TInstr, Token};
+use crate::{
+    constants::{SECTION_DATA_STR, SECTION_PREFIX, SECTION_TEXT_STR},
+    parser::error::TokenizeErr,
+    tokens::{TDataDef, TInstr, Token},
+};
 
 /// Turn a string into a vector of tokens
 #[derive(Debug)]
@@ -38,18 +42,24 @@ impl<'s> Lexer<'s> {
     }
 
     /// Mutates self.tokens
-    pub fn tokenize(&mut self) {
+    pub fn tokenize(&mut self) -> Result<(), TokenizeErr<'s>> {
         while let Some(next_line) = self.next() {
             println!("Tokenizing: '{next_line}'");
             match next_line.trim() {
                 "" => {
                     println!("Empty line.");
                 }
-                section if is_section(section) => todo!("handle sections"),
+                s if let Some(section) = s.strip_prefix(SECTION_PREFIX) => {
+                    self.tokens.push(Token::Section(section))
+                }
                 fn_name if is_func(fn_name) => self.tokenize_fn(&fn_name[..fn_name.len() - 1]),
-                _ => todo!("handle error"),
+                data_def if is_data_def(data_def) => self
+                    .tokens
+                    .push(Token::DataDef(Self::tokenize_data_def(data_def))),
+                bad => return Err(TokenizeErr::BadToken(bad)),
             }
         }
+        Ok(())
     }
 
     fn tokenize_fn(&mut self, fn_name: &'s str) {
@@ -86,6 +96,16 @@ impl<'s> Lexer<'s> {
             }
         }
     }
+
+    fn tokenize_data_def(line: &'s str) -> TDataDef {
+        let parts = line.splitn(3, " ").collect::<Vec<_>>();
+        assert_eq!(parts.len(), 3);
+        TDataDef {
+            name: parts[0],
+            id_type: parts[1],
+            val: parts[2],
+        }
+    }
 }
 
 /// Checks if a line has the pattern of a function
@@ -93,7 +113,10 @@ fn is_func(s: &str) -> bool {
     s.ends_with(":")
 }
 
-/// Checks if a line has the pattern of a section
-fn is_section(s: &str) -> bool {
-    s.starts_with(".")
+fn is_data_def(s: &str) -> bool {
+    let parts = s.split(" ").collect::<Vec<_>>();
+    if parts.len() < 3 {
+        return false;
+    }
+    true
 }

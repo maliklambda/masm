@@ -1,6 +1,16 @@
 /// Define entry point label
 pub const ENTRY_POINT_LABEL: &str = "_start";
 
+/// Prefix to indicate a section.
+/// Everything after the prefix is considered the section name.
+pub const SECTION_PREFIX: &str = "section .";
+
+pub const SECTION_DATA_STR: &str = "data";
+pub const SECTION_TEXT_STR: &str = "text";
+
+/// Signals start and end of a byte array
+pub const DATA_DEFINITION_BYTE_CHAR: char = '"';
+
 /// arg-name dst
 pub const DST_STR: &str = "dst";
 

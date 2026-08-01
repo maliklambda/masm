@@ -1,4 +1,14 @@
-use crate::parser::args::Arg;
+use crate::{
+    parser::args::Arg,
+    tokens::{TDataDef, Token},
+};
+
+#[derive(Debug)]
+pub enum TokenizeErr<'s> {
+    UnknownSection(&'s str),
+    MissingSection,
+    BadToken(&'s str),
+}
 
 #[derive(Debug)]
 pub enum ParseErr<'s> {
@@ -25,5 +35,12 @@ pub enum ResolveErr<'s> {
         instr: &'s str,
         bad_arg: (&'static str /*arg-name*/, &'s Arg<'s>),
     },
-    UnresolvedLable(&'s str),
+    UnresolvedLabel(&'s str),
+    InvalidIdentifierName(TDataDef<'s>),
+    UnknownIdentifierType(TDataDef<'s>),
+    IdentifierTypeMissmatch(TDataDef<'s>),
+    TokenNotAllowedInSection {
+        token: Token<'s>,
+        section: &'static str,
+    },
 }

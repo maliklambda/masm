@@ -1,5 +1,8 @@
 use crate::{
-    constants::{DST_STR, ENTRY_POINT_LABEL},
+    constants::{
+        DATA_DEFINITION_BYTE_CHAR, DST_STR, ENTRY_POINT_LABEL, SECTION_DATA_STR, SECTION_TEXT_STR,
+    },
+    identifier::{ID_TYPE_BYTE, ID_TYPE_WORD, Identifier, IdentifierPair},
     parser::{
         args::{
             Arg,
@@ -8,7 +11,7 @@ use crate::{
         error::{ParseErr, ResolveErr},
         instructions::Instruction,
     },
-    tokens::{TInstr, Token},
+    tokens::{TDataDef, TInstr, Token},
 };
 use std::collections::HashMap;
 
@@ -19,24 +22,141 @@ pub mod instructions;
 /// Turn a vector of tokens into actual instructions
 #[derive(Debug)]
 pub struct Parser<'s> {
+    pub tokens: Vec<Token<'s>>,
+    /// Index to tokens vector
+    pub t_idx: usize,
+    /// functions specified in section text
     pub functions: HashMap<&'s str, Vec<Instruction<'s>>>,
-    pub sections: Vec<()>,
+
+    /// All data definitions
+    pub data_defs: Vec<IdentifierPair<'s>>,
+
+    /// identifiers defined in section data
+    pub identifiers: HashMap<&'s str, Identifier<'s>>,
 }
 
 impl<'s> Parser<'s> {
     pub fn new(tokens: Vec<Token<'s>>) -> Self {
         let mut functions: HashMap<&'s str, Vec<Instruction>> = HashMap::new();
-        for t in tokens {
-            match t {
-                Token::Fn { name, instrs } => functions.insert(
-                    name,
-                    instrs.iter().map(|t| parse_instr(t).unwrap()).collect(),
-                ),
-            };
-        }
         Self {
+            t_idx: 0,
+            tokens,
             functions,
-            sections: vec![],
+            data_defs: vec![],
+            identifiers: HashMap::new(),
+        }
+    }
+
+    pub fn parse(&mut self) -> Result<(), ParseErr<'s>> {
+        println!("Parsing...");
+        loop {
+            let next_token = self.next_token();
+            println!("NEXT TOKEN: {:?}", next_token);
+            match next_token {
+                Some(token) => match token {
+                    Token::Section(section) => self.parse_section(section).unwrap(),
+                    _ => panic!("Cannot have token {:?} in top level", token),
+                },
+                None => return Ok(()),
+            }
+        }
+    }
+
+    fn next_token(&mut self) -> Option<Token<'s>> {
+        if self.t_idx >= self.tokens.len() {
+            None
+        } else {
+            let nt = self.tokens[self.t_idx].clone();
+            self.t_idx += 1;
+            Some(nt)
+        }
+    }
+
+    fn peek_next_token(&self) -> Option<Token<'s>> {
+        if self.t_idx >= self.tokens.len() {
+            None
+        } else {
+            Some(self.tokens[self.t_idx].clone())
+        }
+    }
+
+    fn parse_section(&mut self, section: &'s str) -> Result<(), ResolveErr> {
+        match section {
+            SECTION_DATA_STR => self.parse_data_section()?,
+            SECTION_TEXT_STR => self.parse_text_section()?,
+            _ => panic!("Invalid section"),
+        }
+        Ok(())
+    }
+
+    fn parse_data_section(&mut self) -> Result<(), ResolveErr> {
+        println!("parsing data section");
+        loop {
+            match self.peek_next_token() {
+                Some(Token::Section(_)) => return Ok(()),
+                Some(Token::DataDef(dat)) => {
+                    let _ = self.next_token();
+                    self.data_defs.push(Self::parse_data_def(dat)?)
+                }
+                Some(t) => {
+                    return Err(ResolveErr::TokenNotAllowedInSection {
+                        token: t,
+                        section: "data",
+                    });
+                }
+                None => return Ok(()),
+            }
+        }
+    }
+
+    fn parse_data_def(dat: TDataDef) -> Result<IdentifierPair, ResolveErr> {
+        // check if name is valid identifier
+        if !dat.name.chars().all(|c| c.is_alphabetic() || c == '_') {
+            return Err(ResolveErr::InvalidIdentifierName(dat));
+        }
+
+        match dat.id_type {
+            ID_TYPE_BYTE => {
+                let bytes: &[u8] = dat
+                    .val
+                    .strip_prefix(DATA_DEFINITION_BYTE_CHAR)
+                    .ok_or(ResolveErr::IdentifierTypeMissmatch(dat))?
+                    .strip_suffix(DATA_DEFINITION_BYTE_CHAR)
+                    .ok_or(ResolveErr::IdentifierTypeMissmatch(dat))?
+                    .as_bytes();
+                Ok((dat.name, Identifier::ByteArray(bytes)))
+            }
+            ID_TYPE_WORD => {
+                let v: u16 = dat
+                    .val
+                    .parse()
+                    .map_err(|_| ResolveErr::IdentifierTypeMissmatch(dat))?;
+                Ok((dat.name, Identifier::Word(v)))
+            }
+            _ => Err(ResolveErr::UnknownIdentifierType(dat)),
+        }
+    }
+
+    fn parse_text_section(&mut self) -> Result<(), ResolveErr<'s>> {
+        println!("parsing text section...");
+        loop {
+            match self.peek_next_token() {
+                Some(Token::Section(_)) => return Ok(()),
+                Some(Token::Fn { name, instrs }) => {
+                    self.functions.insert(
+                        name,
+                        instrs.iter().map(|t| parse_instr(t).unwrap()).collect(),
+                    );
+                    self.next_token();
+                }
+                Some(t) => {
+                    return Err(ResolveErr::TokenNotAllowedInSection {
+                        token: t,
+                        section: "text",
+                    });
+                }
+                None => return Ok(()),
+            };
         }
     }
 
@@ -59,7 +179,7 @@ impl<'s> Parser<'s> {
             } = instr
                 && !self.functions.contains_key(lbl)
             {
-                return Err(ResolveErr::UnresolvedLable(lbl));
+                return Err(ResolveErr::UnresolvedLabel(lbl));
             }
             println!("Instr: {:?} is considered valid", instr);
         }
