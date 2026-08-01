@@ -1,6 +1,12 @@
 section .data
-msg db "Hello World"
+counter dw 0
+
+section .rodata
+msg db "Hello World\0"
 len dw 11
+
+section .bss
+buffer resb 32
 
 section .text
 _start:

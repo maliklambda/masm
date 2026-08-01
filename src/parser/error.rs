@@ -43,4 +43,7 @@ pub enum ResolveErr<'s> {
         token: Token<'s>,
         section: &'static str,
     },
+    UninitialzedDataInRoData(TDataDef<'s>),
+    UninitialzedDataInData(TDataDef<'s>),
+    InitializedDataInBss(TDataDef<'s>),
 }

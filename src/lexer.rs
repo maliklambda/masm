@@ -1,5 +1,5 @@
 use crate::{
-    constants::{SECTION_DATA_STR, SECTION_PREFIX, SECTION_TEXT_STR},
+    constants::SECTION_PREFIX,
     parser::error::TokenizeErr,
     tokens::{TDataDef, TInstr, Token},
 };
@@ -97,7 +97,7 @@ impl<'s> Lexer<'s> {
         }
     }
 
-    fn tokenize_data_def(line: &'s str) -> TDataDef {
+    fn tokenize_data_def(line: &'s str) -> TDataDef<'s> {
         let parts = line.splitn(3, " ").collect::<Vec<_>>();
         assert_eq!(parts.len(), 3);
         TDataDef {

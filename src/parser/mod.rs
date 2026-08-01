@@ -1,8 +1,9 @@
 use crate::{
     constants::{
-        DATA_DEFINITION_BYTE_CHAR, DST_STR, ENTRY_POINT_LABEL, SECTION_DATA_STR, SECTION_TEXT_STR,
+        DATA_DEFINITION_BYTE_CHAR, DST_STR, ENTRY_POINT_LABEL, SECTION_BSS_STR, SECTION_DATA_STR,
+        SECTION_RODATA_STR, SECTION_TEXT_STR,
     },
-    identifier::{ID_TYPE_BYTE, ID_TYPE_WORD, Identifier, IdentifierPair},
+    identifier::{ID_TYPE_BYTE, ID_TYPE_RESB, ID_TYPE_WORD, Identifier, IdentifierPair},
     parser::{
         args::{
             Arg,
@@ -11,6 +12,7 @@ use crate::{
         error::{ParseErr, ResolveErr},
         instructions::Instruction,
     },
+    section::DataSectionMode,
     tokens::{TDataDef, TInstr, Token},
 };
 use std::collections::HashMap;
@@ -29,21 +31,24 @@ pub struct Parser<'s> {
     pub functions: HashMap<&'s str, Vec<Instruction<'s>>>,
 
     /// All data definitions
-    pub data_defs: Vec<IdentifierPair<'s>>,
+    pub data: HashMap<&'s str, Identifier<'s>>,
 
-    /// identifiers defined in section data
-    pub identifiers: HashMap<&'s str, Identifier<'s>>,
+    /// All read only data definitions
+    pub ro_data: HashMap<&'s str, Identifier<'s>>,
+
+    /// Unanitialized, reserved data
+    pub bss: HashMap<&'s str, Identifier<'s>>,
 }
 
 impl<'s> Parser<'s> {
     pub fn new(tokens: Vec<Token<'s>>) -> Self {
-        let mut functions: HashMap<&'s str, Vec<Instruction>> = HashMap::new();
         Self {
             t_idx: 0,
             tokens,
-            functions,
-            data_defs: vec![],
-            identifiers: HashMap::new(),
+            functions: HashMap::new(),
+            data: HashMap::new(),
+            ro_data: HashMap::new(),
+            bss: HashMap::new(),
         }
     }
 
@@ -80,23 +85,68 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn parse_section(&mut self, section: &'s str) -> Result<(), ResolveErr> {
+    fn parse_section(&'_ mut self, section: &'s str) -> Result<(), ResolveErr<'_>> {
         match section {
             SECTION_DATA_STR => self.parse_data_section()?,
             SECTION_TEXT_STR => self.parse_text_section()?,
+            SECTION_RODATA_STR => self.parse_rodata_section()?,
+            SECTION_BSS_STR => self.parse_bss_section()?,
             _ => panic!("Invalid section"),
         }
         Ok(())
     }
 
-    fn parse_data_section(&mut self) -> Result<(), ResolveErr> {
+    fn parse_bss_section(&'_ mut self) -> Result<(), ResolveErr<'_>> {
+        self.parse_data_definitions(DataSectionMode::Bss)
+    }
+
+    fn parse_data_section(&'_ mut self) -> Result<(), ResolveErr<'_>> {
+        self.parse_data_definitions(DataSectionMode::Data)
+    }
+
+    fn parse_rodata_section(&'_ mut self) -> Result<(), ResolveErr<'_>> {
+        self.parse_data_definitions(DataSectionMode::RoData)
+    }
+
+    fn parse_data_definitions(
+        &'_ mut self,
+        section_mode: DataSectionMode,
+    ) -> Result<(), ResolveErr<'_>> {
+        // TODO: select correct vector based on read_only or not
+        // let target = if is_read_only {&mut self.data} else {&mut self.ro_data};
         println!("parsing data section");
         loop {
             match self.peek_next_token() {
                 Some(Token::Section(_)) => return Ok(()),
                 Some(Token::DataDef(dat)) => {
                     let _ = self.next_token();
-                    self.data_defs.push(Self::parse_data_def(dat)?)
+                    let data_def = Self::parse_data_def(dat)?;
+                    match section_mode {
+                        DataSectionMode::RoData => {
+                            // assert that data is initialized
+                            if let Identifier::ReservedByteArray(_) = data_def.1 {
+                                return Err(ResolveErr::UninitialzedDataInRoData(dat));
+                            } else {
+                                self.ro_data.insert(data_def.0, data_def.1);
+                            }
+                        }
+                        DataSectionMode::Data => {
+                            // assert that data is initialized
+                            if let Identifier::ReservedByteArray(_) = data_def.1 {
+                                return Err(ResolveErr::UninitialzedDataInData(dat));
+                            } else {
+                                self.data.insert(data_def.0, data_def.1);
+                            }
+                        }
+                        DataSectionMode::Bss => {
+                            // assert that data is not initialized
+                            if let Identifier::ReservedByteArray(_) = data_def.1 {
+                                self.bss.insert(data_def.0, data_def.1);
+                            } else {
+                                return Err(ResolveErr::InitializedDataInBss(dat));
+                            }
+                        }
+                    }
                 }
                 Some(t) => {
                     return Err(ResolveErr::TokenNotAllowedInSection {
@@ -132,6 +182,16 @@ impl<'s> Parser<'s> {
                     .parse()
                     .map_err(|_| ResolveErr::IdentifierTypeMissmatch(dat))?;
                 Ok((dat.name, Identifier::Word(v)))
+            }
+            ID_TYPE_RESB => {
+                let count: u64 = dat
+                    .val
+                    .parse()
+                    .map_err(|_| ResolveErr::IdentifierTypeMissmatch(dat))?;
+                Ok((
+                    dat.name,
+                    Identifier::ReservedByteArray(vec![0_u8; count as usize]),
+                ))
             }
             _ => Err(ResolveErr::UnknownIdentifierType(dat)),
         }

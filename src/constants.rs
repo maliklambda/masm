@@ -7,6 +7,8 @@ pub const SECTION_PREFIX: &str = "section .";
 
 pub const SECTION_DATA_STR: &str = "data";
 pub const SECTION_TEXT_STR: &str = "text";
+pub const SECTION_RODATA_STR: &str = "rodata";
+pub const SECTION_BSS_STR: &str = "bss";
 
 /// Signals start and end of a byte array
 pub const DATA_DEFINITION_BYTE_CHAR: char = '"';
