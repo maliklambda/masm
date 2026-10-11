@@ -1,4 +1,4 @@
-use crate::{
+use crate::core::{
     constants::registers::str_is_reg,
     parser::{args::Arg::Immediate, error::ParseErr},
 };

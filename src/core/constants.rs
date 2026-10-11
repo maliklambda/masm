@@ -23,7 +23,7 @@ pub const SRC_STR: &str = "src";
 pub const LABEL_STR: &str = "label";
 
 pub mod registers {
-    use crate::parser::args::RegId;
+    use crate::core::parser::args::RegId;
     pub const RA: RegId = 0;
     pub const RA_STR: &str = "RA";
 

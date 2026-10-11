@@ -1,4 +1,4 @@
-use crate::parser::{
+use crate::core::parser::{
     args::{Arg, parse_arg},
     error::ParseErr,
     instructions::Instruction,

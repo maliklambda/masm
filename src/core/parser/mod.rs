@@ -1,4 +1,4 @@
-use crate::{
+use crate::core::{
     constants::{
         DATA_DEFINITION_BYTE_CHAR, DST_STR, ENTRY_POINT_LABEL, SECTION_BSS_STR, SECTION_DATA_STR,
         SECTION_RODATA_STR, SECTION_TEXT_STR,

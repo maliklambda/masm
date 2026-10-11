@@ -1,4 +1,4 @@
-use crate::{
+use crate::core::{
     constants::SECTION_PREFIX,
     parser::error::TokenizeErr,
     tokens::{TDataDef, TInstr, Token},

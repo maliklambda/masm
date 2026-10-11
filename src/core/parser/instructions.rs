@@ -1,4 +1,4 @@
-use crate::parser::args::Arg;
+use crate::core::parser::args::Arg;
 
 #[derive(Debug)]
 pub enum Instruction<'s> {

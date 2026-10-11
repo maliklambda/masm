@@ -5,3 +5,12 @@ version = 4
 [[package]]
 name = "masm"
 version = "0.1.0"
+dependencies = [
+ "object-lang",
+]
+
+[[package]]
+name = "object-lang"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0eec74a3515cde2c24e7e1405a77eae67a79b3422c743377fc957620e12dda7"
