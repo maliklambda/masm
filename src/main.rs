@@ -1,5 +1,8 @@
 use std::fs::read_to_string;
 
+use crate::codegen::{CodeGenerator, target::CodeGenTarget};
+
+pub mod codegen;
 pub mod core;
 
 fn main() {
@@ -17,4 +20,8 @@ fn main() {
     println!("Parser: {:?}", parser);
     parser.resolve().unwrap();
     println!("Resolved parser: {:?}", parser);
+
+    // Code Generation
+    let code_gen = CodeGenerator::new(CodeGenTarget::Linux_x86_64, parser, "out", true);
+    code_gen.generate();
 }
